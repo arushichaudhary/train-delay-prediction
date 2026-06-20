@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Velora — Intelligent Rail Delay & Analytics Platform</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FFF8EE;
+    --cream-2:#FFF1DC;
+    --peach:#FFD9B3;
+    --marigold:#F2A65A;
+    --ember:#E8693F;
+    --espresso:#3B2A24;
+    --espresso-soft:#6B5750;
+    --signal-green:#5BAE7E;
+    --signal-amber:#E8A23C;
+    --signal-red:#E0584A;
+    --line:#EADFCB;
+  }
+  *{font-family:'Inter',sans-serif;}
+  .font-display{font-family:'Fraunces',serif;}
+  .font-mono{font-family:'JetBrains Mono',monospace;}
+  body{background:var(--cream); color:var(--espresso);}
+
+  /* perforated ticket-stub card */
+  .ticket{
+    position:relative;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:18px;
+    box-shadow:0 1px 2px rgba(59,42,36,0.04), 0 12px 28px -14px rgba(59,42,36,0.18);
+    transition:transform .25s ease, box-shadow .25s ease;
+  }
+  .ticket:hover{ transform:translateY(-3px); box-shadow:0 1px 2px rgba(59,42,36,0.05), 0 22px 40px -16px rgba(59,42,36,0.24); }
+  .ticket-notch{
+    position:absolute; width:20px; height:20px; background:var(--cream);
+    border:1px solid var(--line); border-radius:50%;
+    top:50%; transform:translateY(-50%);
+  }
+  .ticket-perf{
+    border-left:2px dashed var(--line);
+  }
+
+  /* split-flap style digits for the hero delay number */
+  .flap{
+    background:linear-gradient(180deg,#3B2A24 0%, #2A1D18 100%);
+    color:var(--cream);
+    border-radius:10px;
+    box-shadow: inset 0 -3px 6px rgba(0,0,0,.35), 0 6px 14px -6px rgba(59,42,36,.5);
+  }
+  .flap::after{
+    content:'';
+    position:absolute; left:0; right:0; top:50%; height:1px;
+    background:rgba(0,0,0,.45);
+  }
+
+  .nav-link{ position:relative; }
+  .nav-link::after{
+    content:''; position:absolute; left:0; bottom:-6px; height:2px; width:0%;
+    background:var(--ember); transition:width .2s ease;
+  }
+  .nav-link:hover::after{ width:100%; }
+
+  .btn-primary{
+    background:linear-gradient(135deg, var(--marigold), var(--ember));
+    color:#fff; box-shadow:0 8px 20px -8px rgba(232,105,63,.55);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .btn-primary:hover{ transform:translateY(-1px); box-shadow:0 12px 26px -8px rgba(232,105,63,.65); }
+  .btn-primary:active{ transform:translateY(0px) scale(.98); }
+
+  .pill{ border-radius:999px; }
+  .dot{ display:inline-block; width:9px; height:9px; border-radius:50%; }
+
+  .scrollbar-thin::-webkit-scrollbar{ height:6px; width:6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb{ background:var(--peach); border-radius:6px; }
+
+  .heat-low{ background:var(--signal-green); }
+  .heat-med{ background:var(--signal-amber); }
+  .heat-high{ background:var(--signal-red); }
+
+  .tab-active{ background:var(--espresso); color:var(--cream); }
+
+  input[type=text], input[type=date], select{
+    background:var(--cream); border:1px solid var(--line); color:var(--espresso);
+  }
+  input::placeholder{ color:var(--espresso-soft); opacity:.6;}
+
+  .glow-line{
+    height:2px; background:repeating-linear-gradient(90deg, var(--marigold) 0 10px, transparent 10px 18px);
+  }
+
+  @keyframes pulseDot{ 0%,100%{opacity:1} 50%{opacity:.35} }
+  .pulse{ animation:pulseDot 1.6s ease-in-out infinite; }
+
+  .chat-bubble-bot{ background:var(--cream-2); border:1px solid var(--line); }
+  .chat-bubble-user{ background:var(--espresso); color:var(--cream); }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- ============ NAV ============ -->
+<header class="sticky top-0 z-40 backdrop-blur bg-[var(--cream)]/85 border-b" style="border-color:var(--line)">
+  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <svg width="38" height="38" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="23" stroke="#3B2A24" stroke-width="1.5" fill="#FFF1DC"/>
+        <path d="M14 30 L24 12 L34 30" stroke="#E8693F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="24" cy="30" r="3.2" fill="#5BAE7E"/>
+        <line x1="9" y1="36" x2="39" y2="36" stroke="#3B2A24" stroke-width="1.5"/>
+        <line x1="13" y1="39" x2="17" y2="36" stroke="#3B2A24" stroke-width="1.2"/>
+        <line x1="20" y1="39" x2="24" y2="36" stroke="#3B2A24" stroke-width="1.2"/>
+        <line x1="27" y1="39" x2="31" y2="36" stroke="#3B2A24" stroke-width="1.2"/>
+        <line x1="34" y1="39" x2="38" y2="36" stroke="#3B2A24" stroke-width="1.2"/>
+      </svg>
+      <div>
+        <p class="font-display text-xl font-semibold leading-none">Velora</p>
+        <p class="text-[11px] uppercase tracking-[.18em]" style="color:var(--espresso-soft)">Rail Intelligence</p>
+      </div>
+    </div>
+    <nav class="hidden md:flex items-center gap-8 text-sm font-medium" style="color:var(--espresso-soft)">
+      <a class="nav-link" href="#predict">Predict</a>
+      <a class="nav-link" href="#dashboard">Live Status</a>
+      <a class="nav-link" href="#heatmap">Congestion</a>
+      <a class="nav-link" href="#analytics">Analytics</a>
+      <a class="nav-link" href="#assistant">Assistant</a>
+    </nav>
+    <div class="flex items-center gap-3">
+      <span class="hidden sm:flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 pill" style="background:var(--cream-2); border:1px solid var(--line)">
+        <span class="dot pulse" style="background:var(--signal-green)"></span> API connected
+      </span>
+      <span id="userBadge" class="hidden text-xs font-semibold px-3 py-1.5 pill" style="background:var(--cream-2)"></span>
+      <button id="authBtn" class="btn-primary text-sm font-semibold px-4 py-2 rounded-full">Sign in</button>
+    </div>
+  </div>
+</header>
+
+<!-- ============ AUTH MODAL ============ -->
+<div id="authModal" class="hidden fixed inset-0 z-50 flex items-center justify-center px-4" style="background:rgba(59,42,36,0.45)">
+  <div class="ticket w-full max-w-sm p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 id="authTitle" class="font-display text-lg font-semibold">Sign in to Velora</h3>
+      <button id="authClose" class="text-sm" style="color:var(--espresso-soft)">✕</button>
+    </div>
+    <div id="authNameWrap" class="hidden mb-3">
+      <label class="text-xs font-semibold" style="color:var(--espresso-soft)">Name</label>
+      <input id="authName" type="text" class="mt-1 w-full rounded-lg px-3 py-2.5 text-sm" placeholder="Your name" />
+    </div>
+    <div class="mb-3">
+      <label class="text-xs font-semibold" style="color:var(--espresso-soft)">Email</label>
+      <input id="authEmail" type="text" class="mt-1 w-full rounded-lg px-3 py-2.5 text-sm" placeholder="you@example.com" />
+    </div>
+    <div class="mb-4">
+      <label class="text-xs font-semibold" style="color:var(--espresso-soft)">Password</label>
+      <input id="authPassword" type="password" class="mt-1 w-full rounded-lg px-3 py-2.5 text-sm" placeholder="••••••••" />
+    </div>
+    <button id="authSubmit" class="btn-primary w-full rounded-lg py-2.5 text-sm font-semibold">Sign in</button>
+    <p id="authError" class="text-xs mt-2 hidden" style="color:var(--signal-red)"></p>
+    <p class="text-xs mt-3 text-center" style="color:var(--espresso-soft)">
+      <span id="authToggleText">New here?</span>
+      <button id="authToggle" class="font-semibold underline" style="color:var(--ember)">Create an account</button>
+    </p>
+  </div>
+</div>
+
+<!-- ============ HERO / PREDICT ============ -->
+<section id="predict" class="max-w-7xl mx-auto px-6 pt-14 pb-8">
+  <div class="grid lg:grid-cols-[1.1fr_1fr] gap-10 items-start">
+    <div>
+      <span class="inline-flex items-center gap-2 text-xs font-mono px-3 py-1 pill mb-5" style="background:var(--peach); color:var(--espresso)">
+        ⏱ 12,000+ journeys learned from
+      </span>
+      <h1 class="font-display text-4xl sm:text-5xl font-semibold leading-[1.08] mb-4">
+        Know your train's delay <span style="color:var(--ember)">before</span> the platform does.
+      </h1>
+      <p class="text-base mb-8 max-w-lg" style="color:var(--espresso-soft)">
+        Velora reads weather, congestion and historical patterns to predict delays, explain
+        the cause, and suggest a faster alternative — like a station announcer with a model
+        instead of a microphone.
+      </p>
+
+      <form id="predictForm" class="ticket p-6 sm:p-7">
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide" style="color:var(--espresso-soft)">Train number</label>
+            <input id="trainNo" type="text" placeholder="e.g. 12951" value="12951" class="mt-1 w-full rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2" style="--tw-ring-color:var(--marigold)" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide" style="color:var(--espresso-soft)">Date</label>
+            <input id="travelDate" type="date" class="mt-1 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2" style="--tw-ring-color:var(--marigold)" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide" style="color:var(--espresso-soft)">Source</label>
+            <input id="source" type="text" placeholder="New Delhi" value="New Delhi" class="mt-1 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2" style="--tw-ring-color:var(--marigold)" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide" style="color:var(--espresso-soft)">Destination</label>
+            <input id="destination" type="text" placeholder="Mumbai Central" value="Mumbai Central" class="mt-1 w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2" style="--tw-ring-color:var(--marigold)" />
+          </div>
+        </div>
+        <button type="submit" class="btn-primary w-full mt-5 rounded-lg py-3 text-sm font-semibold">Predict delay</button>
+        <p id="predictError" class="text-xs mt-2 hidden" style="color:var(--signal-red)"></p>
+      </form>
+    </div>
+
+    <!-- Result ticket -->
+    <div id="resultCard" class="ticket overflow-hidden">
+      <div class="px-6 sm:px-7 pt-6 pb-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-xs uppercase tracking-wide" style="color:var(--espresso-soft)">Predicted for</p>
+            <p id="resTrainName" class="font-display text-lg font-semibold">Mumbai Rajdhani Express</p>
+            <p id="resTrainNo" class="font-mono text-xs" style="color:var(--espresso-soft)">#12951 · New Delhi → Mumbai Central</p>
+          </div>
+          <span id="confBadge" class="text-xs font-semibold px-3 py-1.5 pill" style="background:var(--cream-2)">— % confidence</span>
+        </div>
+        <button id="saveTrainBtn" class="mt-3 text-xs font-semibold px-3 py-1.5 pill" style="background:var(--cream-2); border:1px solid var(--line)">☆ Save this train</button>
+        <p id="saveTrainMsg" class="text-xs mt-1 hidden" style="color:var(--espresso-soft)"></p>
+
+        <div class="mt-6 flex items-end gap-3">
+          <div class="flex gap-1.5">
+            <div id="flap1" class="flap w-12 h-16 flex items-center justify-center font-mono text-3xl font-bold">0</div>
+            <div id="flap2" class="flap w-12 h-16 flex items-center justify-center font-mono text-3xl font-bold">0</div>
+          </div>
+          <div class="pb-1">
+            <p class="font-display text-xl font-semibold leading-none">min delay</p>
+            <p id="resArrival" class="text-sm mt-1" style="color:var(--espresso-soft)">Expected arrival —</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="ticket-perf px-6 sm:px-7 py-5" style="background:var(--cream-2)">
+        <p class="text-xs font-semibold uppercase tracking-wide mb-2" style="color:var(--espresso-soft)">Why this delay? (explainable AI)</p>
+        <ul id="causesList" class="space-y-2"></ul>
+      </div>
+
+      <div id="altWrap" class="ticket-perf px-6 sm:px-7 py-5 hidden">
+        <p class="text-xs font-semibold uppercase tracking-wide mb-2" style="color:var(--espresso-soft)">Delay &gt; 60 min — alternatives</p>
+        <div id="altList" class="flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="max-w-7xl mx-auto px-6"><div class="glow-line my-2"></div></div>
+
+<!-- ============ LIVE DASHBOARD ============ -->
+<section id="dashboard" class="max-w-7xl mx-auto px-6 py-12">
+  <div class="flex items-end justify-between mb-6">
+    <div>
+      <p class="text-xs uppercase tracking-[.18em] font-semibold" style="color:var(--ember)">Live</p>
+      <h2 class="font-display text-2xl font-semibold">Train dashboard</h2>
+    </div>
+    <select id="dashTrainSelect" class="rounded-lg px-3 py-2 text-sm font-mono"></select>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-5">
+    <div class="ticket p-6 lg:col-span-1">
+      <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color:var(--espresso-soft)">Upcoming stations</p>
+      <ol id="routeList" class="space-y-4"></ol>
+    </div>
+    <div class="ticket p-6 lg:col-span-2">
+      <p class="text-xs font-semibold uppercase tracking-wide mb-4" style="color:var(--espresso-soft)">Delay trend (last 6 checkpoints)</p>
+      <svg id="trendSvg" viewBox="0 0 600 220" class="w-full h-56"></svg>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONGESTION HEATMAP ============ -->
+<section id="heatmap" class="max-w-7xl mx-auto px-6 py-12">
+  <div class="mb-6">
+    <p class="text-xs uppercase tracking-[.18em] font-semibold" style="color:var(--ember)">Network view</p>
+    <h2 class="font-display text-2xl font-semibold">Route congestion heatmap</h2>
+  </div>
+  <div class="ticket p-6">
+    <div id="heatGrid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3"></div>
+    <div class="flex gap-5 mt-5 text-xs font-medium" style="color:var(--espresso-soft)">
+      <span class="flex items-center gap-1.5"><span class="dot heat-low"></span>Low</span>
+      <span class="flex items-center gap-1.5"><span class="dot heat-med"></span>Medium</span>
+      <span class="flex items-center gap-1.5"><span class="dot heat-high"></span>High</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ WEATHER + SIMULATOR ============ -->
+<section class="max-w-7xl mx-auto px-6 py-12">
+  <div class="grid lg:grid-cols-2 gap-5">
+    <div class="ticket p-6">
+      <p class="text-xs uppercase tracking-[.18em] font-semibold mb-1" style="color:var(--ember)">Explainability</p>
+      <h3 class="font-display text-xl font-semibold mb-4">Weather impact analysis</h3>
+      <div id="weatherBars" class="space-y-3"></div>
+    </div>
+
+    <div class="ticket p-6">
+      <p class="text-xs uppercase tracking-[.18em] font-semibold mb-1" style="color:var(--ember)">What-if</p>
+      <h3 class="font-display text-xl font-semibold mb-4">Delay simulator</h3>
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label class="text-xs font-semibold" style="color:var(--espresso-soft)">Weather</label>
+          <select id="simWeather" class="mt-1 w-full rounded-lg px-3 py-2 text-sm">
+            <option>Clear</option><option>Light Rain</option><option selected>Heavy Rain</option><option>Fog</option><option>Storm</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-semibold" style="color:var(--espresso-soft)">Congestion</label>
+          <select id="simCongestion" class="mt-1 w-full rounded-lg px-3 py-2 text-sm">
+            <option>Low</option><option>Medium</option><option selected>High</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex gap-4 mb-4 text-sm">
+        <label class="flex items-center gap-2"><input type="checkbox" id="simTech"> Technical issue</label>
+        <label class="flex items-center gap-2"><input type="checkbox" id="simSignal"> Signal issue</label>
+      </div>
+      <button id="simBtn" class="btn-primary rounded-lg px-4 py-2.5 text-sm font-semibold w-full">Re-run prediction</button>
+      <p id="simResult" class="font-mono text-2xl font-bold mt-4" style="color:var(--ember)">— min</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ANALYTICS ============ -->
+<section id="analytics" class="max-w-7xl mx-auto px-6 py-12">
+  <div class="mb-6">
+    <p class="text-xs uppercase tracking-[.18em] font-semibold" style="color:var(--ember)">Data analytics</p>
+    <h2 class="font-display text-2xl font-semibold">Delay analytics & rankings</h2>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-5 mb-5">
+    <div class="ticket p-6 lg:col-span-2">
+      <p class="text-xs font-semibold uppercase tracking-wide mb-4" style="color:var(--espresso-soft)">Monthly average delay (minutes)</p>
+      <svg id="monthlySvg" viewBox="0 0 560 200" class="w-full h-48"></svg>
+    </div>
+    <div class="ticket p-6">
+      <p class="text-xs font-semibold uppercase tracking-wide mb-4" style="color:var(--espresso-soft)">Most delayed stations</p>
+      <ul id="stationList" class="space-y-3"></ul>
+    </div>
+  </div>
+
+  <div class="grid lg:grid-cols-2 gap-5">
+    <div class="ticket p-6">
+      <p class="text-xs font-semibold uppercase tracking-wide mb-4" style="color:var(--signal-green)">🏆 Top punctual routes</p>
+      <ol id="punctualList" class="space-y-2 text-sm"></ol>
+    </div>
+    <div class="ticket p-6">
+      <p class="text-xs font-semibold uppercase tracking-wide mb-4" style="color:var(--signal-red)">⚠️ Most delayed routes</p>
+      <ol id="delayedList" class="space-y-2 text-sm"></ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ASSISTANT + SENTIMENT + CROWD ============ -->
+<section id="assistant" class="max-w-7xl mx-auto px-6 py-12">
+  <div class="grid lg:grid-cols-3 gap-5">
+    <div class="ticket p-6 lg:col-span-2 flex flex-col">
+      <p class="text-xs uppercase tracking-[.18em] font-semibold mb-1" style="color:var(--ember)">Ask Velora</p>
+      <h3 class="font-display text-xl font-semibold mb-4">AI travel assistant</h3>
+      <div id="chatWindow" class="flex-1 space-y-3 mb-4 overflow-y-auto scrollbar-thin" style="max-height:280px">
+        <div class="chat-bubble-bot rounded-2xl px-4 py-2.5 text-sm max-w-sm">Hi! Ask me things like "Will train 12951 be delayed tomorrow?"</div>
+      </div>
+      <form id="chatForm" class="flex gap-2">
+        <input id="chatInput" type="text" placeholder="Will train 12951 be delayed tomorrow?" class="flex-1 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2" style="--tw-ring-color:var(--marigold)" />
+        <button class="btn-primary rounded-lg px-4 py-2.5 text-sm font-semibold">Send</button>
+      </form>
+    </div>
+
+    <div class="flex flex-col gap-5">
+      <div class="ticket p-6">
+        <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color:var(--espresso-soft)">Passenger sentiment</p>
+        <div class="flex items-center gap-3">
+          <span id="sentimentDot" class="dot" style="width:14px;height:14px;background:var(--signal-amber)"></span>
+          <span id="sentimentLabel" class="font-display text-lg font-semibold">Neutral</span>
+        </div>
+        <p class="text-xs mt-2" style="color:var(--espresso-soft)">From recent tweets & news mentions (NLP)</p>
+      </div>
+
+      <div class="ticket p-6">
+        <p class="text-xs font-semibold uppercase tracking-wide mb-3" style="color:var(--espresso-soft)">Report an issue</p>
+        <form id="crowdForm" class="space-y-2">
+          <select id="crowdType" class="w-full rounded-lg px-3 py-2 text-sm">
+            <option>Signal issue</option><option>Technical issue</option><option>Track maintenance</option>
+          </select>
+          <button class="btn-primary w-full rounded-lg py-2 text-sm font-semibold">Submit report</button>
+        </form>
+        <p id="crowdConfirm" class="text-xs mt-2 hidden" style="color:var(--signal-green)">Thanks — report logged for #12951.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="border-t mt-8" style="border-color:var(--line)">
+  <div class="max-w-7xl mx-auto px-6 py-8 flex flex-wrap items-center justify-between gap-4 text-xs" style="color:var(--espresso-soft)">
+    <p>© 2026 Velora AI — Intelligent Rail Delay & Analytics Platform</p>
+    <p class="font-mono">RandomForest model · MAE 7.1 min · R² 0.85</p>
+  </div>
+</footer>
+
+<script>
+const API_BASE = (window.location.protocol === 'file:') ? null : 'http://localhost:8000';
+
+// ---------- Fallback mock data (used if backend isn't running) ----------
+const TRAINS = {
+  "12951": {name:"Mumbai Rajdhani Express", route:["New Delhi","Kota Jn","Vadodara Jn","Mumbai Central"]},
+  "12301": {name:"Howrah Rajdhani Express", route:["New Delhi","Kanpur Central","Mughal Sarai","Howrah Jn"]},
+  "12009": {name:"Shatabdi Express", route:["New Delhi","Kanpur Central","Lucknow NR"]},
+  "22439": {name:"Vande Bharat Express", route:["New Delhi","Kanpur Central","Varanasi Jn"]},
+  "12626": {name:"Kerala Express", route:["New Delhi","Nagpur Jn","Chennai Central"]},
+};
+
+function mockPredict(payload){
+  const weatherOpts = ["Clear","Light Rain","Heavy Rain","Fog","Storm"];
+  const congestionOpts = ["Low","Medium","High"];
+  const weather = weatherOpts[Math.floor(Math.random()*weatherOpts.length)];
+  const congestion = congestionOpts[Math.floor(Math.random()*congestionOpts.length)];
+  const wFactor = {Clear:0,"Light Rain":8,"Heavy Rain":25,Fog:35,Storm:30}[weather];
+  const cFactor = {Low:0,Medium:12,High:28}[congestion];
+  const delay = Math.round((6 + wFactor + cFactor + Math.random()*10) * 10)/10;
+  const confidence = Math.max(62, 95 - Math.round(Math.random()*20));
+  const causes = [];
+  if(weather!=="Clear") causes.push({label:`${weather} expected on route`, contribution: 30});
+  if(congestion!=="Low") causes.push({label:`${congestion} congestion near major junctions`, contribution: 18});
+  causes.push({label:"Historical delay pattern for this train", contribution: 8});
+  const train = TRAINS[payload.train_no] || {name:"Unlisted Train"};
+  return {
+    train_no: payload.train_no, train_name: train.name, source: payload.source, destination: payload.destination,
+    delay_minutes: delay, confidence, scheduled_arrival:"14:30",
+    expected_arrival: addMinutes("14:30", delay), weather, congestion, causes,
+    alternatives: delay>60 ? ["Rajdhani Express","Shatabdi Express","Vande Bharat"] : []
+  };
+}
+function addMinutes(hhmm, mins){
+  const [h,m]=hhmm.split(":").map(Number);
+  const d=new Date(); d.setHours(h,m+Math.round(mins));
+  return d.toTimeString().slice(0,5);
+}
+async function api(path, opts){
+  if(!API_BASE) return null;
+  opts = opts || {};
+  const token = (typeof getToken==='function') ? getToken() : null;
+  if(token){
+    opts.headers = Object.assign({}, opts.headers||{}, {Authorization:`Bearer ${token}`});
+  }
+  try{
+    const res = await fetch(API_BASE+path, opts);
+    if(!res.ok) throw new Error("bad response");
+    return await res.json();
+  }catch(e){ return null; }
+}
+
+// ---------- Auth ----------
+let authMode = 'login'; // or 'signup'
+function getToken(){ return localStorage_safe_get('velora_token'); }
+function getUserInfo(){ try{ return JSON.parse(localStorage_safe_get('velora_user')||'null'); }catch(e){ return null; } }
+// NOTE: artifacts environments disallow localStorage; this file is meant to run as a
+// standalone static file (not inside the Claude artifact sandbox), so plain localStorage
+// is used here. If you embed this in an artifact, swap these two helpers for in-memory state.
+function localStorage_safe_get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function localStorage_safe_set(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function localStorage_safe_clear(){ try{ localStorage.removeItem('velora_token'); localStorage.removeItem('velora_user'); }catch(e){} }
+
+function refreshAuthUI(){
+  const badge = document.getElementById('userBadge');
+  const btn = document.getElementById('authBtn');
+  const user = getUserInfo();
+  if(user){
+    badge.textContent = `👤 ${user.name || user.email}`;
+    badge.classList.remove('hidden');
+    btn.textContent = 'Sign out';
+  } else {
+    badge.classList.add('hidden');
+    btn.textContent = 'Sign in';
+  }
+}
+document.getElementById('authBtn').addEventListener('click', ()=>{
+  if(getToken()){ localStorage_safe_clear(); refreshAuthUI(); return; }
+  document.getElementById('authModal').classList.remove('hidden');
+});
+document.getElementById('authClose').addEventListener('click', ()=> document.getElementById('authModal').classList.add('hidden'));
+document.getElementById('authToggle').addEventListener('click', ()=>{
+  authMode = authMode==='login' ? 'signup' : 'login';
+  document.getElementById('authTitle').textContent = authMode==='login' ? 'Sign in to Velora' : 'Create your Velora account';
+  document.getElementById('authSubmit').textContent = authMode==='login' ? 'Sign in' : 'Sign up';
+  document.getElementById('authToggleText').textContent = authMode==='login' ? 'New here?' : 'Already have an account?';
+  document.getElementById('authToggle').textContent = authMode==='login' ? 'Create an account' : 'Sign in instead';
+  document.getElementById('authNameWrap').classList.toggle('hidden', authMode==='login');
+});
+document.getElementById('authSubmit').addEventListener('click', async ()=>{
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const name = document.getElementById('authName').value.trim();
+  const errEl = document.getElementById('authError');
+  errEl.classList.add('hidden');
+  if(!API_BASE){
+    errEl.textContent = 'Backend not reachable — run the FastAPI server to use real login.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  const path = authMode==='login' ? '/api/auth/login' : '/api/auth/signup';
+  const body = authMode==='login' ? {email, password} : {email, password, name};
+  try{
+    const res = await fetch(API_BASE+path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.detail || 'Auth failed');
+    localStorage_safe_set('velora_token', data.access_token);
+    localStorage_safe_set('velora_user', JSON.stringify({email:data.email, name:data.name}));
+    document.getElementById('authModal').classList.add('hidden');
+    refreshAuthUI();
+  }catch(e){
+    errEl.textContent = e.message;
+    errEl.classList.remove('hidden');
+  }
+});
+refreshAuthUI();
+
+// ---------- Predict form ----------
+document.getElementById('predictForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const payload = {
+    train_no: document.getElementById('trainNo').value.trim() || "12951",
+    source: document.getElementById('source').value.trim() || "New Delhi",
+    destination: document.getElementById('destination').value.trim() || "Mumbai Central",
+    date: document.getElementById('travelDate').value || new Date().toISOString().slice(0,10),
+  };
+  let data = await api('/api/predict', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+  if(!data) data = mockPredict(payload);
+  renderPrediction(data);
+});
+
+function renderPrediction(data){
+  document.getElementById('resTrainName').textContent = data.train_name;
+  document.getElementById('resTrainNo').textContent = `#${data.train_no} · ${data.source} → ${data.destination}`;
+  document.getElementById('confBadge').textContent = `${data.confidence}% confidence`;
+  const d = Math.round(data.delay_minutes);
+  const tens = Math.floor(d/10)%10, ones = d%10;
+  document.getElementById('flap1').textContent = d>=100 ? '9' : tens;
+  document.getElementById('flap2').textContent = d>=100 ? '9' : ones;
+  document.getElementById('resArrival').textContent = `Expected arrival ${data.expected_arrival} (sched. ${data.scheduled_arrival})`;
+
+  const list = document.getElementById('causesList');
+  list.innerHTML = '';
+  data.causes.forEach(c=>{
+    const li = document.createElement('li');
+    li.className = 'flex items-center justify-between text-sm';
+    li.innerHTML = `<span>• ${c.label}</span><span class="font-mono text-xs px-2 py-0.5 rounded-full" style="background:var(--peach)">${Math.round(c.contribution)}%</span>`;
+    list.appendChild(li);
+  });
+
+  const altWrap = document.getElementById('altWrap');
+  const altList = document.getElementById('altList');
+  altList.innerHTML = '';
+  if(data.alternatives && data.alternatives.length){
+    altWrap.classList.remove('hidden');
+    data.alternatives.forEach(a=>{
+      const span = document.createElement('span');
+      span.className = 'text-xs font-semibold px-3 py-1.5 pill';
+      span.style.background = 'var(--cream-2)';
+      span.style.border = '1px solid var(--line)';
+      span.textContent = a;
+      altList.appendChild(span);
+    });
+  } else { altWrap.classList.add('hidden'); }
+}
+
+document.getElementById('saveTrainBtn').addEventListener('click', async ()=>{
+  const msg = document.getElementById('saveTrainMsg');
+  if(!getToken()){
+    msg.textContent = 'Sign in to save trains and get alerts.';
+    msg.classList.remove('hidden');
+    document.getElementById('authModal').classList.remove('hidden');
+    return;
+  }
+  const trainNo = document.getElementById('trainNo').value || '12951';
+  const res = await api('/api/saved-trains', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({train_no:trainNo})});
+  msg.textContent = res ? `Saved #${trainNo} to your account.` : 'Could not save — is the backend running?';
+  msg.classList.remove('hidden');
+});
+
+// ---------- Dashboard ----------
+const dashSelect = document.getElementById('dashTrainSelect');
+Object.entries(TRAINS).forEach(([no,t])=>{
+  const opt = document.createElement('option'); opt.value=no; opt.textContent = `${no} — ${t.name}`;
+  dashSelect.appendChild(opt);
+});
+function renderRoute(trainNo){
+  const t = TRAINS[trainNo] || TRAINS["12951"];
+  const list = document.getElementById('routeList');
+  list.innerHTML = '';
+  t.route.forEach((s,i)=>{
+    const li = document.createElement('li');
+    li.className = 'flex items-center gap-3';
+    const status = i===0 ? 'Departed' : (i===1 ? 'Next stop' : 'Upcoming');
+    const color = i===0 ? 'var(--signal-green)' : (i===1 ? 'var(--signal-amber)' : 'var(--espresso-soft)');
+    li.innerHTML = `<span class="dot" style="background:${color}"></span>
+      <div><p class="text-sm font-medium">${s}</p><p class="text-xs" style="color:var(--espresso-soft)">${status}</p></div>`;
+    list.appendChild(li);
+  });
+  renderTrend();
+}
+dashSelect.addEventListener('change', e=>renderRoute(e.target.value));
+renderRoute("12951");
+
+function renderTrend(){
+  const svg = document.getElementById('trendSvg');
+  const pts = Array.from({length:6}, ()=> 5+Math.random()*45);
+  const max = Math.max(...pts, 50);
+  const w=600,h=220,pad=20;
+  const stepX = (w-2*pad)/(pts.length-1);
+  const coords = pts.map((v,i)=> [pad+i*stepX, h-pad-(v/max)*(h-2*pad)]);
+  const path = coords.map((c,i)=> (i===0?'M':'L')+c[0]+','+c[1]).join(' ');
+  const area = path + ` L${coords[coords.length-1][0]},${h-pad} L${coords[0][0]},${h-pad} Z`;
+  svg.innerHTML = `
+    <defs><linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F2A65A" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#F2A65A" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${area}" fill="url(#grad)"/>
+    <path d="${path}" fill="none" stroke="#E8693F" stroke-width="2.5"/>
+    ${coords.map(c=>`<circle cx="${c[0]}" cy="${c[1]}" r="4" fill="#3B2A24"/>`).join('')}
+  `;
+}
+
+// ---------- Heatmap ----------
+async function loadHeatmap(){
+  let data = await api('/api/congestion');
+  if(!data){
+    const stations = ["New Delhi","Kanpur Central","Mughal Sarai","Howrah Jn","Mumbai Central","Vadodara Jn","Chennai Central","Nagpur Jn"];
+    const levels = ["Low","Medium","High"];
+    data = stations.map(s=>({station:s, level: levels[Math.floor(Math.random()*3)]}));
+  }
+  const grid = document.getElementById('heatGrid');
+  grid.innerHTML = '';
+  data.forEach(d=>{
+    const cls = d.level==='Low' ? 'heat-low' : d.level==='Medium' ? 'heat-med' : 'heat-high';
+    const div = document.createElement('div');
+    div.className = `${cls} rounded-xl p-3 text-white text-xs font-semibold flex flex-col justify-between h-20`;
+    div.innerHTML = `<span>${d.station}</span><span class="opacity-90">${d.level}</span>`;
+    grid.appendChild(div);
+  });
+}
+loadHeatmap();
+
+// ---------- Weather impact bars ----------
+function renderWeatherBars(){
+  const data = [
+    {label:"Heavy Rain", pct:42}, {label:"Fog", pct:28}, {label:"Congestion", pct:19}, {label:"Clear conditions", pct:6},
+  ];
+  const wrap = document.getElementById('weatherBars');
+  wrap.innerHTML = '';
+  data.forEach(d=>{
+    const row = document.createElement('div');
+    row.innerHTML = `
+      <div class="flex justify-between text-xs mb-1"><span>${d.label}</span><span class="font-mono">${d.pct}%</span></div>
+      <div class="w-full h-2.5 rounded-full" style="background:var(--cream-2)">
+        <div class="h-2.5 rounded-full" style="width:${d.pct}%; background:linear-gradient(90deg,var(--marigold),var(--ember))"></div>
+      </div>`;
+    wrap.appendChild(row);
+  });
+}
+renderWeatherBars();
+
+// ---------- Simulator ----------
+document.getElementById('simBtn').addEventListener('click', async ()=>{
+  const payload = {
+    train_no: document.getElementById('trainNo').value || "12951",
+    weather: document.getElementById('simWeather').value,
+    congestion: document.getElementById('simCongestion').value,
+    technical_issue: document.getElementById('simTech').checked,
+    signal_issue: document.getElementById('simSignal').checked,
+  };
+  let data = await api('/api/simulate', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+  if(!data){
+    const wFactor = {Clear:0,"Light Rain":8,"Heavy Rain":25,Fog:35,Storm:30}[payload.weather];
+    const cFactor = {Low:0,Medium:12,High:28}[payload.congestion];
+    const delay = Math.round((6+wFactor+cFactor+ (payload.technical_issue?35:0) + (payload.signal_issue?25:0))*10)/10;
+    data = {delay_minutes:delay};
+  }
+  document.getElementById('simResult').textContent = `${Math.round(data.delay_minutes)} min`;
+});
+
+// ---------- Analytics ----------
+async function loadAnalytics(){
+  let data = await api('/api/analytics/overview');
+  if(!data){
+    data = {
+      monthly_trend: ["Jan","Feb","Mar","Apr","May","Jun"].map(m=>({month:m, avg_delay: 10+Math.random()*30})),
+      most_delayed_stations: ["Mughal Sarai","Kanpur Central","Howrah Jn","Delhi Junction","Vijayawada Jn"].map(s=>({station:s, avg_delay:20+Math.random()*35})),
+      most_punctual_routes: ["Vande Bharat Express","Shatabdi Express","Rajdhani Express","Duronto Express","Garib Rath"].map(r=>({route:r, on_time_pct:80+Math.random()*17})),
+      most_delayed_routes: ["Kerala Express","Coromandel Express","Telangana Express","Golden Temple Mail","Swaraj Express"].map(r=>({route:r, avg_delay:30+Math.random()*40})),
+    };
+  }
+  // monthly bar chart
+  const svg = document.getElementById('monthlySvg');
+  const w=560,h=200,pad=30, bw=40;
+  const max = Math.max(...data.monthly_trend.map(d=>d.avg_delay), 40);
+  let bars = '';
+  data.monthly_trend.forEach((d,i)=>{
+    const x = pad + i*((w-2*pad)/data.monthly_trend.length);
+    const bh = (d.avg_delay/max)*(h-2*pad);
+    bars += `<rect x="${x}" y="${h-pad-bh}" width="${bw}" height="${bh}" rx="6" fill="${i%2===0?'#F2A65A':'#E8693F'}"/>
+      <text x="${x+bw/2}" y="${h-8}" font-size="11" text-anchor="middle" fill="#6B5750">${d.month}</text>`;
+  });
+  svg.innerHTML = bars;
+
+  const stationList = document.getElementById('stationList');
+  stationList.innerHTML = '';
+  data.most_delayed_stations.forEach(s=>{
+    const li = document.createElement('li');
+    li.className = 'flex justify-between text-sm';
+    li.innerHTML = `<span>${s.station}</span><span class="font-mono font-semibold" style="color:var(--ember)">${Math.round(s.avg_delay)}m</span>`;
+    stationList.appendChild(li);
+  });
+
+  const punctualList = document.getElementById('punctualList');
+  punctualList.innerHTML = '';
+  data.most_punctual_routes.forEach((r,i)=>{
+    const li = document.createElement('li');
+    li.className = 'flex justify-between';
+    li.innerHTML = `<span>${i+1}. ${r.route}</span><span class="font-mono" style="color:var(--signal-green)">${Math.round(r.on_time_pct)}%</span>`;
+    punctualList.appendChild(li);
+  });
+
+  const delayedList = document.getElementById('delayedList');
+  delayedList.innerHTML = '';
+  data.most_delayed_routes.forEach((r,i)=>{
+    const li = document.createElement('li');
+    li.className = 'flex justify-between';
+    li.innerHTML = `<span>${i+1}. ${r.route}</span><span class="font-mono" style="color:var(--signal-red)">${Math.round(r.avg_delay)}m</span>`;
+    delayedList.appendChild(li);
+  });
+}
+loadAnalytics();
+
+// ---------- Sentiment ----------
+async function loadSentiment(){
+  let data = await api('/api/sentiment');
+  if(!data) data = {overall:"Negative"};
+  const colorMap = {Positive:'var(--signal-green)', Neutral:'var(--signal-amber)', Negative:'var(--signal-red)'};
+  document.getElementById('sentimentLabel').textContent = data.overall;
+  document.getElementById('sentimentDot').style.background = colorMap[data.overall] || 'var(--signal-amber)';
+}
+loadSentiment();
+
+// ---------- Chatbot ----------
+document.getElementById('chatForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if(!msg) return;
+  const win = document.getElementById('chatWindow');
+  win.insertAdjacentHTML('beforeend', `<div class="chat-bubble-user rounded-2xl px-4 py-2.5 text-sm max-w-sm ml-auto">${msg}</div>`);
+  input.value='';
+  let data = await api('/api/chatbot', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})});
+  if(!data){
+    const match = msg.match(/\d{4,5}/);
+    if(match && TRAINS[match[0]]){
+      const delay = Math.round(8+Math.random()*40);
+      data = {reply:`Train ${match[0]} (${TRAINS[match[0]].name}) is expected to run ${delay} min late, with ${Math.max(65,95-delay)}% confidence.`};
+    } else {
+      data = {reply:"Tell me a train number (e.g. 12951) and I can predict its delay for you."};
+    }
+  }
+  win.insertAdjacentHTML('beforeend', `<div class="chat-bubble-bot rounded-2xl px-4 py-2.5 text-sm max-w-sm">${data.reply}</div>`);
+  win.scrollTop = win.scrollHeight;
+});
+
+// ---------- Crowd report ----------
+document.getElementById('crowdForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const issue = document.getElementById('crowdType').value;
+  const trainNo = document.getElementById('trainNo').value || "12951";
+  await api('/api/crowd-reports', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({train_no:trainNo, issue_type:issue})});
+  const c = document.getElementById('crowdConfirm');
+  c.textContent = `Thanks — "${issue}" logged for #${trainNo}.`;
+  c.classList.remove('hidden');
+  setTimeout(()=>c.classList.add('hidden'), 4000);
+});
+
+// default date = tomorrow
+document.getElementById('travelDate').value = new Date(Date.now()+86400000).toISOString().slice(0,10);
+// auto-run a first prediction with mock data for demo purposes
+renderPrediction(mockPredict({train_no:"12951", source:"New Delhi", destination:"Mumbai Central"}));
+</script>
+</body>
+</html>

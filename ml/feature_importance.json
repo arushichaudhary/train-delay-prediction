@@ -1,0 +1,13 @@
+{
+  "weather": 30.3,
+  "technical_issue": 23.3,
+  "congestion": 18.8,
+  "signal_issue": 10.7,
+  "distance_km": 8.1,
+  "historical_avg_delay": 4.3,
+  "source": 1.4,
+  "destination": 1.4,
+  "train_no": 1.0,
+  "day_of_week": 0.5,
+  "is_weekend": 0.1
+}
