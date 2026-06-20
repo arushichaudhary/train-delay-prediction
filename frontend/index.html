@@ -399,7 +399,7 @@
 </footer>
 
 <script>
-const API_BASE = 'https://train-delay-prediction-sgvy.onrender.com';
+const API_BASE = (window.location.protocol === 'file:') ? null : 'http://localhost:8000';
 
 // ---------- Fallback mock data (used if backend isn't running) ----------
 const TRAINS = {
